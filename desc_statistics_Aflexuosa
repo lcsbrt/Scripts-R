@@ -1,0 +1,230 @@
+#---
+#title: "Descriptive Statistics for A. flexuosa characters - Allometry analysis and group analysis"
+#author: "Lucas Brito"
+#date: "28/09/2021"
+#output: R_document
+#---
+
+# Setup
+
+# (1) Load our favourite package (remember that tidyverse contains ggplot2)
+# For this specific analysis, I'm going to use tidyverse, car and sizeMat
+#
+# (2) Read in data that you've uploaded
+# In my case, I'm using 
+# df <- read.delim("my_data.txt")
+# This data frame contains linear morphometric characters, as Height, Length and Width (all of them in mm) 
+# of 700 specimens of Anomalocardia flexuosa (Linnaeus, 1767) divided into three areas within an estuarine zone
+
+#####
+# First test: Shapiro-Wilk
+# S-W Test aims to assess whether a distribution is similar to a normal distribution
+# Making 3 S-W tests for each area using the Length parameter
+
+S_A1 <- shapiro.test(df$C1) #Area 1
+S_A2 <- shapiro.test(df$C2) #Area 2
+S_A3 <- shapiro.test(df$C3) #Area 3
+
+# Printing the results
+S_A1
+S_A2
+S_A3
+
+# My results rejected the initial hypothesis, showing a non-normal distribution. 
+# For my situation, where I have three groups, I will perform a Levene test:
+#####
+# Levene's Test is an alternative to Bartlett's test when the data are not normally distributed.
+
+levene = leveneTest(df$Comprimento ~ df$areas, df)
+
+# Printing the results
+print(levene)
+
+# My h0 hypothesis keeps getting rejected, so now I'm going to do a Kruskal-Wallis test.
+# The Kruskal-Wallis test is the non-parametric test used to compare three or more 
+# independent samples, such as the areas of my data frame
+#####
+# Group levels and ordering the data
+
+df$areas <- ordered(df$areas,
+                         levels = c("area1", "area2", "area3"))
+
+levels(df$areas)
+
+# The data used for this analysis are from three types: representations of areas (numeric and str),
+# linear measures (Length and Height) and maturation stage (1 for adults; 0 for juveniles, and str) 
+
+group_by(df, areas) %>%
+  summarise(
+    count = n(),
+    mean = mean(Comprimento, na.rm = TRUE),       #Comprimento = Lenght
+    sd = sd(Comprimento, na.rm = TRUE),           
+    median = median(Comprimento, na.rm = TRUE),
+    IQR = IQR(Comprimento, na.rm = TRUE)
+  )
+
+# Boxplots for this data
+kw_box<- ggboxplot(df, x = "areas", y = "Comprimento", 
+          color = "areas", palette = c("#00A567", "#FA3A3A", "#9C60FF"),
+          order = c("area1", "area2", "area3"),
+          ylab = "Areas", xlab = " ", ylim= c(0,3))+
+  theme_cleveland()                                                       #here just enter your favorite ggplot2 theme 
+
+# Printing the graph
+kw_box
+
+# Adding mean plots
+ggline(df, x = "areas", y = "Comprimento", 
+       add = c("mean_se", "jitter"), 
+       order = c("area1", "area2", "area3"),
+       ylab = "Weight", xlab = "Treatment")
+
+ggboxplot(df, "areas", "Comprimento",
+          palette =c("#00AFBB", "#E7B800", "#FC4E07"),
+          add = "jitter", shape = 23)
+          
+# Calculating the K-W correlating Lenght and areas
+kruskal.test(Comprimento ~ areas, data = df)
+
+# My results showed to me a p-value less than the significance level 0.05,
+# so we can conclude that there are significant differences between the treatment groups.
+
+# Multiple pairwise-comparison between groups
+#
+# From the output of the Kruskal-Wallis test, we know that there is a 
+# significant difference between groups, but we don’t know which pairs
+# of groups are different. Now I'm going to calculate a pairwise comparisons 
+# between group levels with corrections for multiple testing.
+
+p_comparison<- pairwise.wilcox.test(df$Comprimento, df$areas,
+                     p.adjust.method = "BH")                  # Benjamini-Hochberg adjust method
+
+print(p_comparison)
+
+# My results still showing values less than the significance level 0.05,
+# so now I'm going to make a posthoc Dunn's Test
+#####
+# Dunn Kruskal-Wallis multiple comparison p-values adjusted with the Bonferroni method:
+
+dunnTest(Comprimento ~ areas_num,
+         data=df,
+         method="bonferroni")
+
+# The final test results showed me that all three areas are different among them.
+# Now, let's going to make the allometric analysis
+
+#####
+# Classifying data for all the individuals
+#
+classify_data = classify_mature(df, varNames = c("Comprimento", "Altura"), 
+                                varSex = "mat_stage", selectSex = NULL, method = "ld")
+
+
+# Graphic of Allometric Growth using sizeMat
+#
+plot(classify_data, xlab = "Length (mm)", ylab = "Height (mm)")
+
+#####
+# Frequency histogram
+#
+# Absolut frequencies
+# Area 1
+table(df$C1)
+# Area 2
+table(df$C2)
+# Area 3
+table(df$C3)
+
+# Relative frequencies
+# Area 1
+pt1 <- prop.table(table(df$C1))
+# Area 2
+pt2 <- prop.table(table(df$C2))
+# Area 3
+pt3 <- prop.table(table(df$C3))
+
+# If you want to see if you total N is right in this step,
+# just write sum(pt_x) and check if the total is 1
+
+sum(pt1)
+sum(pt2)
+sum(pt3)
+
+# Building the Histogram chart with the necessary values
+# Quantitative Variables
+
+# Range and Total Range (AT for "Amplitude Total" or Total Range)
+# Area 1
+range(df$C1)
+AT_a1 <- ceiling((max(df$C1)- min(df$C1)))
+AT_a1 #Print the results 
+# Area 2
+range(df$C2)
+AT_a2 <- ceiling((max(df$C2)- min(df$C2)))
+AT_a2 #Print the results                      
+# Area 3
+range(df$C3)
+AT_a3 <- ceiling((max(dfC3)- min(df$C3)))
+AT_a3 #Print the results
+
+#Definign the number of classes
+# Sturges's rule
+# Area 1
+k_a1 <- nclass.Sturges(df$C1)
+k_a1 #Print the results
+#Area 2
+k_a2 <- nclass.Sturges(df$C2)
+k_a2 #Print the results  
+#Area 3
+k_a3 <- nclass.Sturges(df$C3)
+k_a3 #Print the results
+
+#Class size
+# Area 1
+h_a1 <- round((AT_a1/k_a1),1)
+h_a1 #Print the results
+# Area 2
+h_a2 <- round((AT_a2/k_a2),1)
+h_a2 #Print the results  
+# Area 3
+h_a3 <- round((AT_a3/k_a3),1)
+h_a3 #Print the results
+
+# Data for the frequency distribution table
+# Area 1
+infclass_a1 <- min(df$C1) 
+infclass_a1 
+supclass_a1 <- infclass_a1+(k_a1*h_a1)
+supclass_a1 # Print the results
+# Area 2
+infclass_a2 <- min(df$C2)
+infclass_a2 # Print the results
+supclass_a2 <- infclass_a2+(k_a2*h_a2)
+supclass_a2 # Print the results
+# Area 3
+infclass_a3 <- min(df$C3)
+infclass_a3 # Print the results
+supclass_a3 <- infclass_a3+(k_a3*h_a3)
+supclass_a3 # Print the results
+#
+# Breaks of distribution
+# Area 1
+brk_a1 <-seq(infclass_a1,supclass_a1,h_a1)
+brk_a1
+# Area 2
+brk_a2 <-seq(infclass_a2,supclass_a2,h_a2)
+brk_a2
+# Area 3
+brk_a3 <-seq(infclass_a3,supclass_a3,h_a3)
+brk_a3
+# 
+# Absolut frequencies 
+# Area 1
+tabela_FA_a1<- table(cut(df$C1,breaks = brk_a1, right = FALSE))
+tabela_FA_a1
+# Area 2
+tabela_FA_a2<- table(cut(df$C2,breaks = brk_a2, right = FALSE))
+tabela_FA_a2
+# Area 3
+tabela_FA_a3<- table(cut(df$C3,breaks = brk_a3, right = FALSE))
+tabela_FA_a3
